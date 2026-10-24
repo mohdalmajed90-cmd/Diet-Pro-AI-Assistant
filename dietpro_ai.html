@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DietPro AI - مساعدك الغذائي الذكي</title>
+    
+    <!-- إعدادات تطبيق الآيفون (PWA) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="DietPro AI">
+    <!-- أيقونة التطبيق على شاشة الآيفون -->
+    <link rel="apple-touch-icon" href="https://placehold.co/180x180/8b5cf6/ffffff?text=DietPro">
+    <meta name="theme-color" content="#0f172a">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            color: #f8fafc;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        /* Glassmorphism */
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+        .glass-card {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1.5rem;
+        }
+        .glass-input {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .glass-input:focus {
+            outline: none;
+            border-color: #8b5cf6;
+            background: rgba(0, 0, 0, 0.4);
+        }
+        /* Hide scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+        
+        .nav-item.active {
+            color: #a78bfa;
+            border-bottom: 2px solid #a78bfa;
+        }
+        .loader {
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top: 4px solid #a78bfa;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Floating animations */
+        .float { animation: float 6s ease-in-out infinite; }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+    </style>
+</head>
+<body class="pb-20 md:pb-0 md:pl-20 flex flex-col md:flex-row">
+
+    <!-- Ambient Background Effects -->
+    <div class="fixed top-[-10%] left-[-10%] w-96 h-96 bg-purple-600 rounded-full mix-blend-multiply filter blur-[128px] opacity-40 z-0"></div>
+    <div class="fixed bottom-[-10%] right-[-10%] w-96 h-96 bg-blue-600 rounded-full mix-blend-multiply filter blur-[128px] opacity-40 z-0"></div>
+
+    <!-- Navigation (Bottom on Mobile, Left on Desktop) -->
+    <nav class="glass fixed bottom-0 left-0 w-full md:w-24 md:h-full z-50 flex md:flex-col justify-around md:justify-center items-center p-4 md:py-10 rounded-t-3xl md:rounded-none md:rounded-r-3xl">
+        <div class="md:mb-12 hidden md:block">
+            <i class="fas fa-bolt text-3xl text-purple-400 float"></i>
+        </div>
+        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item active flex flex-col items-center p-2 md:mb-6 transition-colors">
+            <i class="fas fa-home text-xl mb-1"></i>
+            <span class="text-xs font-bold">الرئيسية</span>
+        </button>
+        <button onclick="switchTab('ai-builder')" id="nav-ai-builder" class="nav-item flex flex-col items-center p-2 md:mb-6 transition-colors text-gray-400">
+            <i class="fas fa-robot text-xl mb-1"></i>
+            <span class="text-xs font-bold">المساعد</span>
+        </button>
+        <button onclick="switchTab('tracker')" id="nav-tracker" class="nav-item flex flex-col items-center p-2 md:mb-6 transition-colors text-gray-400">
+            <i class="fas fa-chart-line text-xl mb-1"></i>
+            <span class="text-xs font-bold">الوزن</span>
+        </button>
+        <button onclick="switchTab('supplements')" id="nav-supplements" class="nav-item flex flex-col items-center p-2 transition-colors text-gray-400">
+            <i class="fas fa-pills text-xl mb-1"></i>
+            <span class="text-xs font-bold">المكملات</span>
+        </button>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="relative z-10 flex-1 w-full max-w-4xl mx-auto p-4 md:p-8 pt-8">
+        
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400">DietPro AI</h1>
+                <p class="text-sm text-gray-400">مرحباً يا بطل، خطتك لوزن 85 كج تبدأ هنا!</p>
+            </div>
+            <div class="w-12 h-12 rounded-full glass flex items-center justify-center border-purple-500 border-2 overflow-hidden shadow-[0_0_15px_rgba(168,85,247,0.5)]">
+                <i class="fas fa-user-ninja text-purple-300 text-xl"></i>
+            </div>
+        </header>
+
+        <!-- Loading Overlay -->
+        <div id="auth-loading" class="fixed inset-0 bg-gray-900 z-50 flex flex-col items-center justify-center">
+            <div class="loader mb-4"></div>
+            <p class="text-purple-400 font-bold animate-pulse">جاري تجهيز بياناتك المشفرة...</p>
+        </div>
+
+        <!-- ================= DASHBOARD TAB ================= -->
+        <section id="tab-dashboard" class="tab-content animate-fade-in block">
+            <!-- Calorie Overview -->
+            <div class="glass-card p-6 mb-6 flex flex-col md:flex-row items-center justify-between">
+                <div class="relative w-40 h-40 flex items-center justify-center mb-6 md:mb-0">
+                    <svg class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="8"></circle>
+                        <circle id="calorie-progress-circle" cx="50" cy="50" r="45" fill="none" stroke="#a78bfa" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="283" class="transition-all duration-1000 ease-out"></circle>
+                    </svg>
+                    <div class="absolute flex flex-col items-center">
+                        <span id="calories-remaining" class="text-3xl font-black">2000</span>
+                        <span class="text-xs text-gray-400">متبقي (kcal)</span>
+                    </div>
+                </div>
+                
+                <div class="flex-1 w-full md:mr-8 space-y-4">
+                    <!-- Macros -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span>بروتين <i class="fas fa-drumstick-bite text-orange-400"></i></span>
+                            <span id="protein-text">0 / 180g</span>
+                        </div>
+                        <div class="w-full bg-gray-800 rounded-full h-2">
+                            <div id="protein-bar" class="bg-orange-400 h-2 rounded-full transition-all duration-1000" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span>كاربوهيدرات <i class="fas fa-bread-slice text-blue-400"></i></span>
+                            <span id="carbs-text">0 / 150g</span>
+                        </div>
+                        <div class="w-full bg-gray-800 rounded-full h-2">
+                            <div id="carbs-bar" class="bg-blue-400 h-2 rounded-full transition-all duration-1000" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span>دهون <i class="fas fa-cheese text-yellow-400"></i></span>
+                            <span id="fats-text">0 / 65g</span>
+                        </div>
+                        <div class="w-full bg-gray-800 rounded-full h-2">
+                            <div id="fats-bar" class="bg-yellow-400 h-2 rounded-full transition-all duration-1000" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cheat Meal Bank -->
+            <div class="glass-card p-6 mb-6 relative overflow-hidden group">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-yellow-500 rounded-full mix-blend-multiply filter blur-[50px] opacity-20 group-hover:opacity-40 transition-opacity"></div>
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-xl font-bold mb-1"><i class="fas fa-vault text-yellow-400 mr-2"></i> بنك الوجبة المفتوحة</h2>
+                        <p class="text-sm text-gray-400">يتم إضافة 200 سعرة يومياً لرصيد وجبتك المفتوحة</p>
+                    </div>
+                    <div class="text-center">
+                        <span class="block text-3xl font-black text-yellow-400" id="cheat-bank-cals">0</span>
+                        <span class="text-xs text-gray-400">سعرة متوفرة</span>
+                    </div>
+                </div>
+                <div class="mt-4 w-full bg-gray-800 rounded-full h-3">
+                    <div id="cheat-bank-progress" class="bg-gradient-to-r from-yellow-500 to-orange-500 h-3 rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)] transition-all duration-1000" style="width: 0%"></div>
+                </div>
+                <p class="text-xs text-center mt-2 text-gray-400">الهدف: 2600 سعرة (كل 13 يوم)</p>
+            </div>
+
+            <!-- Today's Meals List -->
+            <h3 class="font-bold text-lg mb-3">وجبات اليوم</h3>
+            <div id="meals-list" class="space-y-3 mb-6">
+                <!-- Meals injected via JS -->
+            </div>
+            
+            <button onclick="switchTab('ai-builder')" class="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-700 transition font-bold shadow-lg flex items-center justify-center">
+                <i class="fas fa-plus ml-2"></i> أضف وجبة جديدة
+            </button>
+        </section>
+
+        <!-- ================= AI BUILDER TAB ================= -->
+        <section id="tab-ai-builder" class="tab-content hidden animate-fade-in">
+            <div class="glass-card p-6 mb-6 border-purple-500/30 border">
+                <h2 class="text-2xl font-bold mb-2 text-purple-300"><i class="fas fa-magic mr-2"></i> مصمم الوجبات (Gemini AI)</h2>
+                <p class="text-sm text-gray-400 mb-4">اكتب أي شيء تشتهيه، حتى لو كان من جسميز، ماكدونالدز، كافتيريا، أو رز كبسة مع دجاج أمريكانا. وسأقوم بحساب الكميات بالجرام لتناسب سعراتك!</p>
+                
+                <div class="relative">
+                    <select id="ai-meal-slot" class="w-full glass-input mb-3 p-3 rounded-xl font-bold text-purple-300 border border-purple-500/50 outline-none">
+                        <option value="breakfast">الفطور (400 سعرة | 35g بروتين | 30g كارب)</option>
+                        <option value="lunch">الغداء (600 سعرة | 55g بروتين | 45g كارب)</option>
+                        <option value="dinner">العشاء (600 سعرة | 55g بروتين | 45g كارب)</option>
+                        <option value="snack1">سناك 1 (200 سعرة | 18g بروتين | 15g كارب)</option>
+                        <option value="snack2">سناك 2 (200 سعرة | 17g بروتين | 15g كارب)</option>
+                    </select>
+                    <textarea id="ai-food-input" class="w-full glass-input rounded-xl p-4 min-h-[120px] pb-14 text-lg resize-none" placeholder="مثال: مشتهي اليوم اكل من دجاج ستربس امريكانا مع بطاطس ماكين في الايرفراير، مع عصير جح وبكتيريا نافعه..."></textarea>
+                    <button id="ai-generate-btn" class="absolute bottom-3 left-3 bg-purple-600 hover:bg-purple-500 text-white p-2 px-4 rounded-lg font-bold transition flex items-center shadow-lg">
+                        <i class="fas fa-brain ml-2"></i> احسبها لي
+                    </button>
+                </div>
+            </div>
+
+            <!-- AI Response Area -->
+            <div id="ai-result-area" class="hidden">
+                <div class="glass-card p-6 mb-6 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-20 h-20 bg-green-500 rounded-full mix-blend-multiply filter blur-[40px] opacity-20"></div>
+                    <h3 class="text-xl font-bold mb-4 border-b border-gray-700 pb-2" id="ai-meal-name">اسم الوجبة</h3>
+                    
+                    <div class="grid grid-cols-3 gap-2 mb-4 text-center">
+                        <div class="bg-gray-800/50 p-2 rounded-lg">
+                            <span class="block text-xs text-gray-400">بروتين</span>
+                            <span class="font-bold text-orange-400" id="ai-meal-p">0g</span>
+                        </div>
+                        <div class="bg-gray-800/50 p-2 rounded-lg">
+                            <span class="block text-xs text-gray-400">كارب</span>
+                            <span class="font-bold text-blue-400" id="ai-meal-c">0g</span>
+                        </div>
+                        <div class="bg-gray-800/50 p-2 rounded-lg">
+                            <span class="block text-xs text-gray-400">دهون</span>
+                            <span class="font-bold text-yellow-400" id="ai-meal-f">0g</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <span class="text-xs text-gray-400 mb-1 block">السعرات الإجمالية:</span>
+                        <span class="text-2xl font-black text-white" id="ai-meal-cals">0</span> <span class="text-sm">kcal</span>
+                    </div>
+
+                    <h4 class="font-bold text-sm text-purple-300 mb-2">المقادير بالجرام:</h4>
+                    <ul id="ai-meal-portions" class="list-disc list-inside space-y-1 text-sm mb-4 text-gray-300">
+                        <!-- Portions -->
+                    </ul>
+
+                    <div class="bg-blue-900/30 p-3 rounded-lg border border-blue-500/20 text-sm text-blue-200 mb-4">
+                        <i class="fas fa-info-circle mr-1"></i> <span id="ai-meal-advice">نصيحة</span>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button id="btn-eat-meal" class="flex-1 bg-green-600 hover:bg-green-500 py-3 rounded-xl font-bold transition shadow-lg">
+                            <i class="fas fa-check-circle ml-1"></i> أكلت هذه الوجبة
+                        </button>
+                        <button onclick="document.getElementById('ai-result-area').classList.add('hidden')" class="bg-gray-700 hover:bg-gray-600 py-3 px-4 rounded-xl font-bold transition">
+                            إلغاء
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manual Entry -->
+            <div class="glass-card p-6 mt-6">
+                <h3 class="font-bold mb-4"><i class="fas fa-edit mr-2 text-blue-400"></i> إدخال يدوي</h3>
+                <select id="manual-meal-slot" class="w-full glass-input mb-3 p-3 rounded-lg text-sm border border-gray-600 outline-none">
+                    <option value="breakfast">الفطور</option>
+                    <option value="lunch">الغداء</option>
+                    <option value="dinner">العشاء</option>
+                    <option value="snack1">سناك 1</option>
+                    <option value="snack2">سناك 2</option>
+                </select>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <input type="text" id="manual-name" placeholder="اسم الوجبة" class="col-span-2 glass-input p-3 rounded-lg text-sm">
+                    <input type="number" id="manual-cal" placeholder="السعرات" class="glass-input p-3 rounded-lg text-sm">
+                    <input type="number" id="manual-p" placeholder="البروتين (g)" class="glass-input p-3 rounded-lg text-sm">
+                    <input type="number" id="manual-c" placeholder="الكارب (g)" class="glass-input p-3 rounded-lg text-sm">
+                    <input type="number" id="manual-f" placeholder="الدهون (g)" class="glass-input p-3 rounded-lg text-sm">
+                </div>
+                <button id="btn-manual-add" class="w-full bg-blue-600 hover:bg-blue-500 py-2 rounded-lg font-bold transition">
+                    إضافة يدوية
+                </button>
+            </div>
+        </section>
+
+        <!-- ================= TRACKER TAB ================= -->
+        <section id="tab-tracker" class="tab-content hidden animate-fade-in">
+            
+            <div class="glass-card p-6 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold"><i class="fas fa-weight scale mr-2 text-green-400"></i> متتبع الوزن</h2>
+                    <span class="bg-purple-500/20 text-purple-300 text-xs px-2 py-1 rounded font-bold">الهدف: -1kg أسبوعياً</span>
+                </div>
+                
+                <!-- Chart -->
+                <div class="w-full h-64 mb-6 relative">
+                    <canvas id="weightChart"></canvas>
+                </div>
+
+                <!-- Input form -->
+                <div class="flex gap-2">
+                    <input type="number" step="0.1" id="weight-input" placeholder="وزن اليوم (كج)" class="flex-1 glass-input p-3 rounded-xl text-lg font-bold text-center">
+                    <button id="btn-add-weight" class="bg-green-600 hover:bg-green-500 px-6 rounded-xl font-bold transition shadow-[0_0_15px_rgba(22,163,74,0.4)]">
+                        سجل
+                    </button>
+                </div>
+            </div>
+
+            <!-- AI Weight Analysis -->
+            <div class="glass-card p-5 border border-blue-500/30">
+                <h3 class="font-bold text-blue-300 mb-2"><i class="fas fa-robot mr-2"></i> تحليل الذكاء الاصطناعي</h3>
+                <p id="ai-weight-analysis" class="text-sm text-gray-300 leading-relaxed">
+                    جاري جمع البيانات... استمر في تسجيل وزنك اليومي ليقوم المساعد الذكي بتعديل سعراتك تلقائياً إذا لزم الأمر.
+                </p>
+            </div>
+        </section>
+
+        <!-- ================= SUPPLEMENTS TAB ================= -->
+        <section id="tab-supplements" class="tab-content hidden animate-fade-in">
+            <div class="glass-card p-6 mb-6">
+                <h2 class="text-xl font-bold mb-2"><i class="fas fa-pills mr-2 text-pink-400"></i> جدول المكملات الاحترافي</h2>
+                <p class="text-sm text-gray-400 mb-6">تم ترتيب مكملاتك بناءً على وقت الامتصاص الأمثل وتداخلها مع الوجبات.</p>
+
+                <div class="relative border-r-2 border-gray-700 pr-6 space-y-8">
+                    
+                    <!-- Morning -->
+                    <div class="relative">
+                        <div class="absolute -right-[31px] w-4 h-4 rounded-full bg-yellow-500 shadow-[0_0_10px_#eab308]"></div>
+                        <h3 class="font-bold text-yellow-400 mb-2">صباحاً (على الريق)</h3>
+                        <div class="bg-gray-800/50 p-3 rounded-lg border border-gray-700 mb-2">
+                            <span class="font-bold text-white block">بكتيريا نافعة (Probiotics)</span>
+                            <span class="text-xs text-gray-400">لأفضل امتصاص بعيداً عن أحماض الهضم الناتجة عن الأكل.</span>
+                        </div>
+                        <div class="bg-gray-800/50 p-3 rounded-lg border border-gray-700">
+                            <span class="font-bold text-white block">L-Carnitine</span>
+                            <span class="text-xs text-gray-400">قبل الكارديو بـ 30 دقيقة (على معدة خالية يزيد من حرق الدهون).</span>
+                        </div>
+                    </div>
+
+                    <!-- Breakfast -->
+                    <div class="relative">
+                        <div class="absolute -right-[31px] w-4 h-4 rounded-full bg-orange-400 shadow-[0_0_10px_#fb923c]"></div>
+                        <h3 class="font-bold text-orange-400 mb-2">مع الفطور (أو قبل أكبر وجبة كارب)</h3>
+                        <div class="bg-gray-800/50 p-3 rounded-lg border border-gray-700 mb-2">
+                            <span class="font-bold text-white block">فيتامين د (Vitamin D)</span>
+                            <span class="text-xs text-gray-400">فيتامين يذوب في الدهون، يحتاج وجبة بها زبدة فول سوداني أو بيض.</span>
+                        </div>
+                        <div class="bg-gray-800/50 p-3 rounded-lg border border-gray-700 mb-2">
+                            <span class="font-bold text-white block">أوميغا 3 (Omega 3)</span>
+                            <span class="text-xs text-gray-400">يفضل مع وجبة دهنية لزيادة الامتصاص ومنع طعم السمك.</span>
+                        </div>
+                        <div class="bg-gray-800/50 p-3 rounded-lg border border-gray-700 mb-2">
+                            <span class="font-bold text-white block">فيتامين سي (Vitamin C)</span>
+                            <span class="text-xs text-gray-400">مضاد أكسدة ممتاز لبدء اليوم.</span>
+                        </div>
+                        <div class="bg-gray-800/50 p-3 rounded-lg border border-gray-700">
+                            <span class="font-bold text-white block">R-ALA (150mg)</span>
+                            <span class="text-xs text-gray-400">يؤخذ قبل الوجبة بـ 15-30 دقيقة (خاصة إذا كانت غنية بالكاربوهيدرات). يحسن حساسية الأنسولين ويوجه الكارب للعضلات بدلاً من الخلايا الدهنية.</span>
+                        </div>
+                    </div>
+
+                    <!-- Post Workout -->
+                    <div class="relative">
+                        <div class="absolute -right-[31px] w-4 h-4 rounded-full bg-blue-500 shadow-[0_0_10px_#3b82f6]"></div>
+                        <h3 class="font-bold text-blue-400 mb-2">بعد تمرين المقاومة مباشر</h3>
+                        <div class="bg-gray-800/50 p-3 rounded-lg border border-gray-700 mb-2">
+                            <span class="font-bold text-white block">بروتين شيك (Whey / Beef)</span>
+                            <span class="text-xs text-gray-400">سكوب واحد للاستشفاء العضلي السريع.</span>
+                        </div>
+                        <div class="bg-gray-800/50 p-3 rounded-lg border border-gray-700">
+                            <span class="font-bold text-white block">كرياتين (Creatine - 5g)</span>
+                            <span class="text-xs text-gray-400">اخلطه مع البروتين. يفضل وجود مصدر كارب بسيط معه لسرعة النقل للعضلات.</span>
+                        </div>
+                    </div>
+
+                    <!-- Before Bed -->
+                    <div class="relative">
+                        <div class="absolute -right-[31px] w-4 h-4 rounded-full bg-purple-500 shadow-[0_0_10px_#a855f7]"></div>
+                        <h3 class="font-bold text-purple-400 mb-2">قبل النوم (بـ 45 دقيقة)</h3>
+                        <div class="bg-gray-800/50 p-3 rounded-lg border border-gray-700">
+                            <span class="font-bold text-white block">ماغنيسيوم جلايسينيت</span>
+                            <span class="text-xs text-gray-400">يساعد على استرخاء العضلات، النوم العميق، وتقليل التوتر العضلي بعد التمرين.</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Firebase SDK Setup -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot, addDoc, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global State
+        const STARTING_WEIGHT = 126.9;
+        const TARGET_CALORIES = 2000;
+        const MACRO_TARGETS = { p: 180, c: 150, f: 65 }; // Rough estimate for 2000 cals (180*4 + 150*4 + 65*9 = 1905, close enough to 2000)
+        
+        // الأهداف المخصصة لكل وجبة بشكل مستقل
+        const SLOT_TARGETS = {
+            breakfast: { label: 'الفطور', cals: 400, p: 35, c: 30, f: 13 },
+            lunch: { label: 'الغداء', cals: 600, p: 55, c: 45, f: 20 },
+            dinner: { label: 'العشاء', cals: 600, p: 55, c: 45, f: 20 },
+            snack1: { label: 'سناك 1', cals: 200, p: 18, c: 15, f: 6 },
+            snack2: { label: 'سناك 2', cals: 200, p: 17, c: 15, f: 6 }
+        };
+
+        let currentState = {
+            consumedCals: 0, consumedP: 0, consumedC: 0, consumedF: 0, meals: [], cheatBank: 0, weightLogs: []
+        };
+        let currentUserId = null;
+        let weightChartInstance = null;
+
+        // Configuration
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'dietpro-app-v1';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        let app, db, auth;
+
+        // Init Firebase safely
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+        } catch (e) {
+            console.error("Firebase Init Error", e);
+        }
+
+        async function initApp() {
+            try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                currentUserId = auth.currentUser.uid;
+                document.getElementById('auth-loading').style.display = 'none';
+                loadUserData();
+            } catch (error) {
+                console.error("Authentication Error", error);
+                alert("حدث خطأ في تسجيل الدخول");
+            }
+        }
+
+        // Wait for Firebase to load
+        setTimeout(() => { if(!currentUserId && auth) initApp(); }, 500);
+        window.addEventListener('load', () => { if(auth) initApp(); });
+
+        // Switch Tabs Logic (Global)
+        window.switchTab = function(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('active');
+                el.classList.add('text-gray-400');
+            });
+            
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            const navBtn = document.getElementById(`nav-${tabId}`);
+            navBtn.classList.add('active');
+            navBtn.classList.remove('text-gray-400');
+
+            if (tabId === 'tracker') renderChart();
+        };
+
+        // UI Updates
+        function updateDashboardUI() {
+            // Calories
+            const remaining = TARGET_CALORIES - currentState.consumedCals;
+            document.getElementById('calories-remaining').textContent = remaining > 0 ? remaining : 0;
+            
+            const percentage = Math.min((currentState.consumedCals / TARGET_CALORIES) * 100, 100);
+            const offset = 283 - (283 * percentage) / 100;
+            document.getElementById('calorie-progress-circle').style.strokeDashoffset = offset;
+            document.getElementById('calorie-progress-circle').style.stroke = remaining < 0 ? '#ef4444' : '#a78bfa';
+
+            // Macros
+            document.getElementById('protein-text').textContent = `${Math.round(currentState.consumedP)} / ${MACRO_TARGETS.p}g`;
+            document.getElementById('protein-bar').style.width = `${Math.min((currentState.consumedP / MACRO_TARGETS.p) * 100, 100)}%`;
+
+            document.getElementById('carbs-text').textContent = `${Math.round(currentState.consumedC)} / ${MACRO_TARGETS.c}g`;
+            document.getElementById('carbs-bar').style.width = `${Math.min((currentState.consumedC / MACRO_TARGETS.c) * 100, 100)}%`;
+
+            document.getElementById('fats-text').textContent = `${Math.round(currentState.consumedF)} / ${MACRO_TARGETS.f}g`;
+            document.getElementById('fats-bar').style.width = `${Math.min((currentState.consumedF / MACRO_TARGETS.f) * 100, 100)}%`;
+
+            // Cheat Bank
+            document.getElementById('cheat-bank-cals').textContent = currentState.cheatBank;
+            const bankPct = Math.min((currentState.cheatBank / 2600) * 100, 100); // 13 days * 200 = 2600
+            document.getElementById('cheat-bank-progress').style.width = `${bankPct}%`;
+
+            // Meals List grouped by slots
+            const list = document.getElementById('meals-list');
+            list.innerHTML = '';
+            
+            Object.keys(SLOT_TARGETS).forEach(slotKey => {
+                const target = SLOT_TARGETS[slotKey];
+                // إذا كان هناك وجبة قديمة بدون تخصيص، يتم وضعها افتراضياً في سناك 1 لكي تظهر
+                const slotMeals = currentState.meals.filter(m => m.slot === slotKey || (!m.slot && slotKey === 'snack1'));
+                
+                const consumedCals = slotMeals.reduce((sum, m) => sum + m.cals, 0);
+                const consumedP = slotMeals.reduce((sum, m) => sum + m.p, 0);
+                const consumedC = slotMeals.reduce((sum, m) => sum + m.c, 0);
+                const consumedF = slotMeals.reduce((sum, m) => sum + m.f, 0);
+                
+                let mealsHtml = slotMeals.map(m => `
+                    <div class="flex justify-between items-center text-sm mb-2 pb-2 border-b border-gray-700/50 last:border-0 last:pb-0 last:mb-0">
+                        <span class="text-gray-300">- ${m.name}</span>
+                        <div class="text-right">
+                            <span class="text-purple-400 font-bold">${m.cals} kcal</span>
+                            <span class="block text-[10px] text-gray-500">P:${m.p}g | C:${m.c}g | F:${m.f}g</span>
+                        </div>
+                    </div>
+                `).join('');
+                
+                if(slotMeals.length === 0) mealsHtml = `<span class="text-xs text-gray-500 block text-center mt-2">لم يتم تسجيل طعام في هذه الوجبة</span>`;
+
+                list.innerHTML += `
+                    <div class="glass-card p-4 mb-4 bg-white/5 border-r-4 ${consumedCals > target.cals ? 'border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : 'border-purple-500'}">
+                        <div class="flex justify-between items-center mb-2 border-b border-gray-700/50 pb-2">
+                            <h4 class="font-bold text-white"><i class="fas fa-utensils text-purple-400 mr-2"></i> ${target.label}</h4>
+                            <div class="text-xs text-gray-400 text-left">
+                                السعرات: <span class="${consumedCals > target.cals ? 'text-red-400' : 'text-white'} font-bold">${consumedCals}</span> / ${target.cals}
+                            </div>
+                        </div>
+                        <div class="flex justify-between text-[10px] text-gray-400 mb-3 px-2 bg-black/20 rounded py-1 border border-gray-700/50">
+                            <span class="${consumedP > target.p ? 'text-orange-400' : ''}">بروتين: ${consumedP}/${target.p}g</span>
+                            <span class="${consumedC > target.c ? 'text-blue-400' : ''}">كارب: ${consumedC}/${target.c}g</span>
+                            <span class="${consumedF > target.f ? 'text-yellow-400' : ''}">دهون: ${consumedF}/${target.f}g</span>
+                        </div>
+                        <div class="bg-gray-900/40 p-2 rounded-lg">
+                            ${mealsHtml}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // Database Logic
+        function loadUserData() {
+            if (!currentUserId) return;
+            
+            // Listen to daily state
+            const today = new Date().toISOString().split('T')[0];
+            const stateRef = doc(db, 'artifacts', appId, 'users', currentUserId, 'dailyStates', today);
+            
+            onSnapshot(stateRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    currentState.consumedCals = data.consumedCals || 0;
+                    currentState.consumedP = data.consumedP || 0;
+                    currentState.consumedC = data.consumedC || 0;
+                    currentState.consumedF = data.consumedF || 0;
+                    currentState.meals = data.meals || [];
+                } else {
+                    // New day reset
+                    currentState.consumedCals = 0; currentState.consumedP = 0; currentState.consumedC = 0; currentState.consumedF = 0; currentState.meals = [];
+                }
+                updateDashboardUI();
+            }, (err) => console.error(err));
+
+            // Profile / Cheat Bank / Weight
+            const profileRef = doc(db, 'artifacts', appId, 'users', currentUserId);
+            onSnapshot(profileRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    currentState.cheatBank = docSnap.data().cheatBank || 0;
+                    currentState.weightLogs = docSnap.data().weightLogs || [];
+                    
+                    // Add initial weight if empty
+                    if(currentState.weightLogs.length === 0) {
+                        currentState.weightLogs.push({ date: today, weight: STARTING_WEIGHT });
+                        saveProfileData();
+                    }
+                } else {
+                    // Init profile
+                    currentState.weightLogs = [{ date: today, weight: STARTING_WEIGHT }];
+                    saveProfileData();
+                }
+                updateDashboardUI();
+                renderChart();
+                analyzeWeightProgress();
+            }, (err) => console.error(err));
+        }
+
+        async function saveDailyState() {
+            if (!currentUserId) return;
+            const today = new Date().toISOString().split('T')[0];
+            const stateRef = doc(db, 'artifacts', appId, 'users', currentUserId, 'dailyStates', today);
+            await setDoc(stateRef, {
+                consumedCals: currentState.consumedCals,
+                consumedP: currentState.consumedP,
+                consumedC: currentState.consumedC,
+                consumedF: currentState.consumedF,
+                meals: currentState.meals
+            }, {merge: true});
+        }
+
+        async function saveProfileData() {
+            if (!currentUserId) return;
+            const profileRef = doc(db, 'artifacts', appId, 'users', currentUserId);
+            await setDoc(profileRef, {
+                cheatBank: currentState.cheatBank,
+                weightLogs: currentState.weightLogs
+            }, {merge: true});
+        }
+
+        // Actions
+        async function addMeal(name, cals, p, c, f, slot = 'snack1') {
+            currentState.meals.push({ name, cals: parseInt(cals), p: parseInt(p), c: parseInt(c), f: parseInt(f), slot });
+            currentState.consumedCals += parseInt(cals);
+            currentState.consumedP += parseInt(p);
+            currentState.consumedC += parseInt(c);
+            currentState.consumedF += parseInt(f);
+            await saveDailyState();
+            switchTab('dashboard');
+        }
+
+        // Manual Add Listener
+        document.getElementById('btn-manual-add').addEventListener('click', () => {
+            const slot = document.getElementById('manual-meal-slot').value;
+            const name = document.getElementById('manual-name').value;
+            const cal = document.getElementById('manual-cal').value;
+            const p = document.getElementById('manual-p').value;
+            const c = document.getElementById('manual-c').value;
+            const f = document.getElementById('manual-f').value;
+            if(name && cal) {
+                addMeal(name, cal, p||0, c||0, f||0, slot);
+                document.querySelectorAll('#tab-ai-builder input').forEach(el => el.value = '');
+            }
+        });
+
+        // Add Weight
+        document.getElementById('btn-add-weight').addEventListener('click', () => {
+            const weight = parseFloat(document.getElementById('weight-input').value);
+            if(!weight) return;
+            const today = new Date().toISOString().split('T')[0];
+            
+            // update if today exists, else push
+            const idx = currentState.weightLogs.findIndex(w => w.date === today);
+            if (idx >= 0) {
+                currentState.weightLogs[idx].weight = weight;
+            } else {
+                currentState.weightLogs.push({ date: today, weight: weight });
+            }
+            
+            // Automatically add to cheat bank every time they log a new day (simple logic)
+            if (idx < 0) {
+                currentState.cheatBank += 200;
+            }
+
+            saveProfileData();
+            document.getElementById('weight-input').value = '';
+        });
+
+        // Chart Logic
+        function renderChart() {
+            const ctx = document.getElementById('weightChart');
+            if(!ctx) return;
+            
+            if(weightChartInstance) {
+                weightChartInstance.destroy();
+            }
+
+            const sortedLogs = [...currentState.weightLogs].sort((a,b) => new Date(a.date) - new Date(b.date));
+            const labels = sortedLogs.map(l => {
+                const d = new Date(l.date);
+                return `${d.getDate()}/${d.getMonth()+1}`;
+            });
+            const data = sortedLogs.map(l => l.weight);
+
+            weightChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'الوزن (كج)',
+                        data: data,
+                        borderColor: '#22c55e',
+                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#fff',
+                        pointRadius: 5,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { 
+                            beginAtZero: false, 
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#9ca3af' }
+                        },
+                        x: { 
+                            grid: { display: false },
+                            ticks: { color: '#9ca3af' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        // Simple AI Weight Analysis Logic
+        function analyzeWeightProgress() {
+            if(currentState.weightLogs.length < 3) return;
+            const logs = [...currentState.weightLogs].sort((a,b) => new Date(a.date) - new Date(b.date));
+            const first = logs[0].weight;
+            const latest = logs[logs.length-1].weight;
+            const el = document.getElementById('ai-weight-analysis');
+            
+            if (latest >= first) {
+                el.innerHTML = `<span class="text-yellow-400 font-bold">تنبيه من الذكاء الاصطناعي:</span> لاحظت ثباتاً أو زيادة طفيفة في الوزن (${latest} كج). أنصحك بتقليل السعرات اليومية بمقدار 150-200 سعرة، أو زيادة مدة الكارديو 10 دقائق لتكسير الثبات.`;
+            } else {
+                el.innerHTML = `<span class="text-green-400 font-bold">ممتاز يا بطل!</span> لقد نزلت من ${first} إلى ${latest} كج. أنت في الطريق الصحيح، استمر على نفس النظام (2000 سعرة).`;
+            }
+        }
+
+        // Gemini AI Integration
+        document.getElementById('ai-generate-btn').addEventListener('click', async () => {
+            const input = document.getElementById('ai-food-input').value;
+            const slotKey = document.getElementById('ai-meal-slot').value;
+            if(!input) return;
+
+            const btn = document.getElementById('ai-generate-btn');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحساب...';
+            btn.disabled = true;
+
+            // حساب المتبقي للوجبة المحددة بالتحديد
+            const target = SLOT_TARGETS[slotKey];
+            const slotMeals = currentState.meals.filter(m => m.slot === slotKey);
+            const consumedCals = slotMeals.reduce((sum, m) => sum + m.cals, 0);
+            const consumedP = slotMeals.reduce((sum, m) => sum + m.p, 0);
+            const consumedC = slotMeals.reduce((sum, m) => sum + m.c, 0);
+            const consumedF = slotMeals.reduce((sum, m) => sum + m.f, 0);
+
+            const remainingCals = Math.max(0, target.cals - consumedCals);
+            const remainingP = Math.max(0, target.p - consumedP);
+            const remainingC = Math.max(0, target.c - consumedC);
+            const remainingF = Math.max(0, target.f - consumedF);
+
+            if (remainingCals === 0) {
+                alert('لقد استهلكت كامل سعرات هذه الوجبة! يرجى اختيار وجبة أخرى أو زيادة نشاطك الكارديو.');
+                btn.innerHTML = '<i class="fas fa-brain ml-2"></i> احسبها لي';
+                btn.disabled = false;
+                return;
+            }
+
+            const systemPrompt = `You are an elite, highly professional Arab nutritionist AI. The user is a 35-year-old male, 180cm, starting at 126.9kg.
+            The user has requested: "${input}" specifically for the meal: "${target.label}". 
+            IMPORTANT MAXIMUM LIMITS FOR THIS SPECIFIC MEAL SLOT: ${remainingCals} kcal, ${remainingP}g Protein, ${remainingC}g Carbs, ${remainingF}g Fats.
+            You MUST output ONLY a valid JSON string (no markdown, no backticks).
+            Calculate exact portions (in grams/pieces) for the requested food so it strictly fits within THIS MEAL'S limits. Do not exceed ${remainingCals} calories!
+            Format EXACTLY like this:
+            {
+                "mealName": "اسم الوجبة بناء على الطلب",
+                "portions": ["150 جرام صدر دجاج", "100 جرام رز الكبسة", "سلطة خضراء"],
+                "totalCalories": 550,
+                "protein": 45,
+                "carbs": 50,
+                "fats": 15,
+                "advice": "نصيحة قصيرة جدا باللغة العربية بخصوص هذه الوجبة"
+            }`;
+
+            const payload = {
+                contents: [{ parts: [{ text: systemPrompt }] }],
+            };
+
+            const apiKey = ""; // Canvas auto-injects
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                
+                let text = result.candidates[0].content.parts[0].text;
+                // Clean up possible markdown in JSON
+                text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                
+                const mealData = JSON.parse(text);
+
+                // Populate UI
+                document.getElementById('ai-meal-name').textContent = mealData.mealName;
+                document.getElementById('ai-meal-p').textContent = mealData.protein + 'g';
+                document.getElementById('ai-meal-c').textContent = mealData.carbs + 'g';
+                document.getElementById('ai-meal-f').textContent = mealData.fats + 'g';
+                document.getElementById('ai-meal-cals').textContent = mealData.totalCalories;
+                
+                const ul = document.getElementById('ai-meal-portions');
+                ul.innerHTML = mealData.portions.map(p => `<li><i class="fas fa-check text-green-400 mr-1 text-xs"></i> ${p}</li>`).join('');
+                
+                document.getElementById('ai-meal-advice').textContent = mealData.advice;
+                document.getElementById('ai-result-area').classList.remove('hidden');
+
+                // Attach eat button
+                document.getElementById('btn-eat-meal').onclick = () => {
+                    addMeal(mealData.mealName, mealData.totalCalories, mealData.protein, mealData.carbs, mealData.fats, slotKey);
+                    document.getElementById('ai-food-input').value = '';
+                    document.getElementById('ai-result-area').classList.add('hidden');
+                };
+
+            } catch (error) {
+                console.error(error);
+                alert('حدث خطأ في الاتصال بالذكاء الاصطناعي. تأكد من أن طلبك واضح.');
+            } finally {
+                btn.innerHTML = '<i class="fas fa-brain ml-2"></i> احسبها لي';
+                btn.disabled = false;
+            }
+        });
+
+    </script>
+</body>
+</html>
